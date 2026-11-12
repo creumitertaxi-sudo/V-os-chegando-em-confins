@@ -18,9 +18,7 @@
         :root {
             --bg-color: #061a14;
             --header-bg: #000000;
-            --text-col-header: #facc15; /* Amarelo forte estilo painel original */
-            --text-cyan-bright: #38fcd0;
-            --text-data: #ffffff;
+            --text-col-header: #facc15;
             --row-even-bg: rgba(0, 0, 0, 0.3);
             --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
         }
@@ -57,7 +55,7 @@
         .fids-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 1.1rem;
+            font-size: 1.05rem;
             white-space: nowrap;
         }
 
@@ -73,8 +71,8 @@
         }
 
         .fids-table tbody tr {
-            height: 50px;
-            transition: background-color 0.4s ease;
+            height: 48px;
+            transition: background-color 0.3s ease;
         }
 
         .fids-table tbody tr:nth-child(even) {
@@ -92,19 +90,20 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 76px;
-            height: 30px;
+            width: 72px;
+            height: 28px;
             background-color: #ffffff;
             border-radius: 4px;
             padding: 2px;
         }
 
         /* Status Colors */
-        .status-landed { color: #34d399; font-weight: 800; } /* Verde Pousado */
-        .status-baggage { color: #34d399; font-weight: 800; } /* Verde Last/Baggage */
-        .status-parking { color: #60a5fa; font-weight: 800; } /* Azul Parking */
-        .status-scheduled { color: #ffffff; font-weight: 800; } /* Branco Scheduled */
-        .status-now { color: #fb923c; font-weight: 800; animation: pulse 1.5s infinite; } /* Laranja destaque */
+        .status-landed { color: #34d399; font-weight: 800; }
+        .status-baggage { color: #34d399; font-weight: 800; }
+        .status-parking { color: #60a5fa; font-weight: 800; }
+        .status-scheduled { color: #ffffff; font-weight: 800; }
+        .status-delayed { color: #f87171; font-weight: 800; }
+        .status-now { color: #fb923c; font-weight: 800; animation: pulse 1.5s infinite; }
 
         @keyframes pulse {
             0% { opacity: 1; }
@@ -123,7 +122,7 @@
         <!-- Control Bar -->
         <div id="controls-bar" class="bg-black/90 text-xs px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b border-emerald-900/60">
             <div class="flex items-center gap-3">
-                <span class="text-yellow-400 font-bold uppercase tracking-wider">CNF FIDS Real-Time</span>
+                <span class="text-yellow-400 font-bold uppercase tracking-wider">CNF FIDS Diário Completo</span>
                 <input type="text" id="search-input" placeholder="Filtrar voo, origem, status..." class="bg-emerald-950/80 border border-emerald-700/60 text-emerald-200 px-3 py-1 rounded focus:outline-none focus:border-yellow-400 w-56 placeholder-emerald-700">
             </div>
 
@@ -144,7 +143,7 @@
         <!-- FIDS Header Bar -->
         <header class="fids-header">
             <div class="text-xl md:text-2xl font-bold tracking-wider text-yellow-400" id="current-date">--/--/----</div>
-            <div class="text-2xl md:text-4xl font-extrabold tracking-wide text-center uppercase text-yellow-400">Chegadas</div>
+            <div class="text-2xl md:text-4xl font-extrabold tracking-wide text-center uppercase text-yellow-400">Chegadas - Confins (CNF)</div>
             <div class="text-2xl md:text-4xl font-bold tracking-wider text-right text-yellow-400" id="current-time">00:00:00</div>
         </header>
 
@@ -170,35 +169,48 @@
     </div>
 
     <script>
-        // Logótipos em SVG fiéis ao painel
         const LOGOS = {
             AZUL: `<div class="logo-box"><svg viewBox="0 0 120 40" class="w-full h-full"><text x="5" y="28" font-family="Arial, sans-serif" font-size="22" font-weight="900" fill="#002d72">Azul</text><path d="M95 10 L105 10 L110 18 L100 28 L90 28 Z" fill="#00a3e0"/><circle cx="108" cy="12" r="2.5" fill="#e4002b"/></svg></div>`,
             LATAM: `<div class="logo-box"><svg viewBox="0 0 140 40" class="w-full h-full"><path d="M5 8 L35 8 L30 14 L10 14 Z" fill="#e2001a"/><path d="M12 18 L38 18 L33 24 L7 24 Z" fill="#00142e"/><text x="42" y="17" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#00142e">LATAM</text><text x="42" y="26" font-family="Arial, sans-serif" font-size="7" font-weight="bold" fill="#e2001a">AIRLINES</text></svg></div>`,
-            GOL: `<div class="logo-box"><svg viewBox="0 0 100 40" class="w-full h-full"><text x="8" y="27" font-family="'Arial Black', sans-serif" font-size="20" font-style="italic" font-weight="900" fill="#ff5a00">GOL</text></svg></div>`
+            GOL: `<div class="logo-box"><svg viewBox="0 0 100 40" class="w-full h-full"><text x="8" y="27" font-family="'Arial Black', sans-serif" font-size="20" font-style="italic" font-weight="900" fill="#ff5a00">GOL</text></svg></div>`,
+            TAP: `<div class="logo-box"><svg viewBox="0 0 100 40" class="w-full h-full"><text x="8" y="27" font-family="Arial, sans-serif" font-size="20" font-weight="900" fill="#00843d">TAP</text></svg></div>`,
+            COPA: `<div class="logo-box"><svg viewBox="0 0 100 40" class="w-full h-full"><text x="8" y="27" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#003366">Copa</text></svg></div>`
         };
 
-        // Base de rotas sincronizada com o padrão da foto de referência para Confins (CNF)
-        let baseFlights = [
-            { time: "09:00", est: "08:55", orig: "Rio de Janeiro - Galeão", cia: "GOL", flight: "2022", belt: "2", status: "Last Baggage" },
-            { time: "09:00", est: "08:59", orig: "Vitória", cia: "AZUL", flight: "2761", belt: "1", status: "Last Baggage" },
-            { time: "09:05", est: "09:02", orig: "Campinas", cia: "AZUL", flight: "2658", belt: "1", status: "Parking" },
-            { time: "09:15", est: "09:00", orig: "São Paulo - Congonhas", cia: "LATAM", flight: "3038", belt: "2", status: "Landed" },
-            { time: "09:25", est: "09:50", orig: "Rio de Janeiro - Santos Dumont", cia: "AZUL", flight: "4051", belt: "1", status: "Now at 09:50" },
-            { time: "09:25", est: "09:13", orig: "Porto Seguro", cia: "AZUL", flight: "2475", belt: "1", status: "Baggage Delivery" },
-            { time: "09:35", est: "09:10", orig: "São Paulo - Congonhas", cia: "GOL", flight: "1306", belt: "2", status: "Last Baggage" },
-            { time: "10:00", est: "09:50", orig: "São Paulo - Guarulhos", cia: "LATAM", flight: "4650", belt: "2", status: "Now at 09:50" },
+        // Base completa de voos do dia para o Aeroporto de Confins (CNF)
+        let allFlights = [
+            { time: "05:00", est: "05:06", orig: "Recife", cia: "AZUL", flight: "4605", belt: "1", status: "Last Baggage" },
+            { time: "05:20", est: "05:20", orig: "Fortaleza", cia: "AZUL", flight: "2933", belt: "2", status: "Last Baggage" },
+            { time: "06:00", est: "06:11", orig: "Santarém", cia: "AZUL", flight: "2756", belt: "1", status: "Last Baggage" },
+            { time: "06:30", est: "06:32", orig: "Ipatinga", cia: "AZUL", flight: "4029", belt: "2", status: "Parking" },
+            { time: "06:50", est: "06:52", orig: "Rio de Janeiro - Galeão", cia: "AZUL", flight: "4505", belt: "1", status: "Landed" },
+            { time: "06:55", est: "06:55", orig: "Vitória", cia: "AZUL", flight: "4413", belt: "2", status: "Landed" },
+            { time: "07:00", est: "07:02", orig: "São Paulo - Guarulhos", cia: "AZUL", flight: "4522", belt: "1", status: "Landed" },
+            { time: "07:18", est: "07:18", orig: "São Paulo - Congonhas", cia: "AZUL", flight: "4030", belt: "2", status: "Landed" },
+            { time: "08:50", est: "08:50", orig: "Rio de Janeiro - Galeão", cia: "AZUL", flight: "2900", belt: "1", status: "Last Baggage" },
+            { time: "08:50", est: "08:50", orig: "Vitória", cia: "AZUL", flight: "2761", belt: "2", status: "Last Baggage" },
+            { time: "08:55", est: "08:55", orig: "Campinas - Viracopos", cia: "AZUL", flight: "2658", belt: "1", status: "Parking" },
+            { time: "09:00", est: "09:00", orig: "São Paulo - Congonhas", cia: "LATAM", flight: "3038", belt: "2", status: "Landed" },
+            { time: "09:13", est: "09:13", orig: "Porto Seguro", cia: "AZUL", flight: "2475", belt: "1", status: "Baggage Delivery" },
+            { time: "09:50", est: "09:50", orig: "São Paulo - Guarulhos", cia: "LATAM", flight: "4650", belt: "2", status: "Now at 09:50" },
             { time: "10:15", est: "10:15", orig: "Brasília", cia: "LATAM", flight: "3720", belt: "2", status: "Scheduled" },
-            { time: "10:25", est: "09:57", orig: "São Paulo - Congonhas", cia: "AZUL", flight: "6020", belt: "1", status: "Now at 09:57" },
-            { time: "10:35", est: "10:35", orig: "São Paulo - Guarulhos", cia: "GOL", flight: "1482", belt: "2", status: "Scheduled" },
-            { time: "10:40", est: "10:40", orig: "Governador Valadares", cia: "AZUL", flight: "2758", belt: "1", status: "Scheduled" },
-            { time: "10:55", est: "10:55", orig: "Brasília", cia: "GOL", flight: "1622", belt: "2", status: "Scheduled" },
-            { time: "11:10", est: "11:10", orig: "Campinas", cia: "AZUL", flight: "4045", belt: "1", status: "Scheduled" },
-            { time: "11:15", est: "11:15", orig: "Rio de Janeiro - Santos Dumont", cia: "AZUL", flight: "4118", belt: "1", status: "Scheduled" },
-            { time: "11:15", est: "11:15", orig: "São Paulo - Guarulhos", cia: "AZUL", flight: "4570", belt: "1", status: "Scheduled" },
-            { time: "11:35", est: "11:35", orig: "Brasília", cia: "AZUL", flight: "5068", belt: "1", status: "Scheduled" },
+            { time: "10:55", est: "10:55", orig: "Brasília", cia: "GOL", flight: "1622", belt: "1", status: "Scheduled" },
+            { time: "11:10", est: "11:10", orig: "Campinas - Viracopos", cia: "AZUL", flight: "4045", belt: "2", status: "Scheduled" },
             { time: "11:35", est: "11:35", orig: "São Paulo - Congonhas", cia: "AZUL", flight: "6400", belt: "1", status: "Scheduled" },
-            { time: "11:45", est: "11:45", orig: "Goiânia", cia: "AZUL", flight: "4016", belt: "1", status: "Scheduled" },
-            { time: "11:45", est: "11:45", orig: "Recife", cia: "AZUL", flight: "2802", belt: "1", status: "Scheduled" }
+            { time: "12:00", est: "11:41", orig: "São Paulo - Congonhas", cia: "GOL", flight: "1308", belt: "3", status: "Parking" },
+            { time: "12:15", est: "12:15", orig: "São Paulo - Guarulhos", cia: "LATAM", flight: "3050", belt: "2", status: "Scheduled" },
+            { time: "13:00", est: "13:10", orig: "Rio de Janeiro - Santos Dumont", cia: "AZUL", flight: "4051", belt: "1", status: "Scheduled" },
+            { time: "14:15", est: "14:15", orig: "Salvador", cia: "AZUL", flight: "2738", belt: "1", status: "Scheduled" },
+            { time: "15:30", est: "15:30", orig: "Curitiba", cia: "AZUL", flight: "2857", belt: "2", status: "Scheduled" },
+            { time: "16:30", est: "16:32", orig: "Ipatinga", cia: "AZUL", flight: "4317", belt: "1", status: "Scheduled" },
+            { time: "17:00", est: "17:07", orig: "Curitiba", cia: "AZUL", flight: "2947", belt: "2", status: "Scheduled" },
+            { time: "17:35", est: "18:45", orig: "Rio de Janeiro - Santos Dumont", cia: "AZUL", flight: "4751", belt: "1", status: "Delayed" },
+            { time: "18:15", est: "18:15", orig: "Lisboa", cia: "TAP", flight: "104", belt: "6", status: "Scheduled" },
+            { time: "19:10", est: "19:10", orig: "Rio de Janeiro - Galeão", cia: "GOL", flight: "4405", belt: "1", status: "Scheduled" },
+            { time: "20:30", est: "20:30", orig: "São Paulo - Congonhas", cia: "AZUL", flight: "1321", belt: "2", status: "Scheduled" },
+            { time: "21:05", est: "21:05", orig: "Rio de Janeiro - Santos Dumont", cia: "AZUL", flight: "2908", belt: "1", status: "Scheduled" },
+            { time: "22:00", est: "22:00", orig: "Florianópolis", cia: "AZUL", flight: "4230", belt: "2", status: "Scheduled" },
+            { time: "23:55", est: "23:55", orig: "Panama City", cia: "COPA", flight: "734", belt: "6", status: "Scheduled" }
         ];
 
         let filterQuery = '';
@@ -207,7 +219,7 @@
             const tbody = document.getElementById('fids-body');
             tbody.innerHTML = '';
 
-            const filtered = baseFlights.filter(f => {
+            const filtered = allFlights.filter(f => {
                 if (!filterQuery) return true;
                 const q = filterQuery.toLowerCase();
                 return f.flight.toLowerCase().includes(q) || f.orig.toLowerCase().includes(q) || f.status.toLowerCase().includes(q);
@@ -231,6 +243,9 @@
                 } else if (f.status === 'Baggage Delivery') {
                     statusClass = 'status-baggage';
                     translatedStatus = 'Entrega de Bagagens';
+                } else if (f.status === 'Delayed') {
+                    statusClass = 'status-delayed';
+                    translatedStatus = 'Atrasado';
                 } else if (f.status.startsWith('Now at')) {
                     statusClass = 'status-now';
                     translatedStatus = f.status.replace('Now at', 'Agora às');
@@ -251,7 +266,6 @@
             });
         }
 
-        // Atualização do Relógio em Tempo Real
         function updateClock() {
             const now = new Date();
             document.getElementById('current-date').innerText = now.toLocaleDateString('pt-BR');
@@ -271,7 +285,7 @@
             renderTable();
         });
 
-        // Registro de PWA Service Worker via Blob
+        // Registro automático de Service Worker para habilitar PWA
         if ('serviceWorker' in navigator) {
             const swCode = `self.addEventListener('install', e => e.waitUntil(self.skipWaiting())); self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));`;
             const swBlob = new Blob([swCode], { type: 'text/javascript' });
@@ -304,3 +318,4 @@
     </script>
 </body>
 </html>
+
