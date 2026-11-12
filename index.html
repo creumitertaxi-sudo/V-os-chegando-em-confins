@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chegadas - Aeroporto Internacional Tancredo Neves (CNF)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="data:application/manifest+json;charset=utf-8,{
+      %22name%22: %22Painel CNF Chegadas%22,
+      %22short_name%22: %22CNF Chegadas%22,
+      %22start_url%22: %22./index.html%22,
+      %22display%22: %22standalone%22,
+      %22background_color%22: %22%23061a14%22,
+      %22theme_color%22: %22%23000000%22,
+      %22icons%22: [{%22src%22: %22https://cdn-icons-png.flaticon.com/512/3125/3125883.png%22, %22sizes%22: %22512x512%22, %22type%22: %22image/png%22}]
+    }">
+    <style>
+        :root {
+            --bg-color: #061a14;
+            --header-bg: #000000;
+            --text-col-header: #facc15; /* Amarelo forte estilo painel original */
+            --text-cyan-bright: #38fcd0;
+            --text-data: #ffffff;
+            --row-even-bg: rgba(0, 0, 0, 0.3);
+            --font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+        }
+
+        body {
+            background-color: #020c09;
+            color: #ffffff;
+            font-family: var(--font-family);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            user-select: none;
+        }
+
+        .display-container {
+            width: 100%;
+            min-height: 100vh;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            overflow-x: auto;
+        }
+
+        .fids-header {
+            background-color: var(--header-bg);
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            padding: 12px 24px;
+            border-bottom: 2px solid #1a3a30;
+        }
+
+        .fids-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 1.1rem;
+            white-space: nowrap;
+        }
+
+        .fids-table th {
+            color: var(--text-col-header);
+            font-size: 0.95rem;
+            font-weight: 800;
+            text-align: center;
+            padding: 10px 6px;
+            text-transform: uppercase;
+            border-bottom: 2px solid #1a4235;
+            letter-spacing: 0.5px;
+        }
+
+        .fids-table tbody tr {
+            height: 50px;
+            transition: background-color 0.4s ease;
+        }
+
+        .fids-table tbody tr:nth-child(even) {
+            background-color: var(--row-even-bg);
+        }
+
+        .fids-table td {
+            padding: 6px 8px;
+            vertical-align: middle;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        .logo-box {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 76px;
+            height: 30px;
+            background-color: #ffffff;
+            border-radius: 4px;
+            padding: 2px;
+        }
+
+        /* Status Colors */
+        .status-landed { color: #34d399; font-weight: 800; } /* Verde Pousado */
+        .status-baggage { color: #34d399; font-weight: 800; } /* Verde Last/Baggage */
+        .status-parking { color: #60a5fa; font-weight: 800; } /* Azul Parking */
+        .status-scheduled { color: #ffffff; font-weight: 800; } /* Branco Scheduled */
+        .status-now { color: #fb923c; font-weight: 800; animation: pulse 1.5s infinite; } /* Laranja destaque */
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        ::-webkit-scrollbar { height: 6px; width: 6px; }
+        ::-webkit-scrollbar-track { background: #061a14; }
+        ::-webkit-scrollbar-thumb { background: #1a4235; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <div class="display-container">
+        <!-- Control Bar -->
+        <div id="controls-bar" class="bg-black/90 text-xs px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b border-emerald-900/60">
+            <div class="flex items-center gap-3">
+                <span class="text-yellow-400 font-bold uppercase tracking-wider">CNF FIDS Real-Time</span>
+                <input type="text" id="search-input" placeholder="Filtrar voo, origem, status..." class="bg-emerald-950/80 border border-emerald-700/60 text-emerald-200 px-3 py-1 rounded focus:outline-none focus:border-yellow-400 w-56 placeholder-emerald-700">
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button id="pwa-install-btn" class="hidden bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-3 py-1 rounded transition shadow">
+                    📲 Instalar PWA
+                </button>
+                <label class="flex items-center gap-1.5 cursor-pointer text-yellow-200 font-medium">
+                    <input type="checkbox" id="audio-toggle" checked class="accent-yellow-500">
+                    <span>Áudio Voz</span>
+                </label>
+                <button onclick="toggleFullscreen()" class="bg-emerald-800 hover:bg-emerald-700 text-white px-3 py-1 rounded transition">
+                    ⛶ Tela Cheia
+                </button>
+            </div>
+        </div>
+
+        <!-- FIDS Header Bar -->
+        <header class="fids-header">
+            <div class="text-xl md:text-2xl font-bold tracking-wider text-yellow-400" id="current-date">--/--/----</div>
+            <div class="text-2xl md:text-4xl font-extrabold tracking-wide text-center uppercase text-yellow-400">Chegadas</div>
+            <div class="text-2xl md:text-4xl font-bold tracking-wider text-right text-yellow-400" id="current-time">00:00:00</div>
+        </header>
+
+        <!-- Main Flight Table -->
+        <div class="flex-1 overflow-x-auto p-2">
+            <table class="fids-table">
+                <thead>
+                    <tr>
+                        <th class="text-left pl-4">HORÁRIO</th>
+                        <th>ESTIMADO</th>
+                        <th class="text-left">ORIGEM / VIA</th>
+                        <th>COMPANHIA</th>
+                        <th>VOO</th>
+                        <th>ESTEIRA</th>
+                        <th class="text-right pr-6">STATUS</th>
+                    </tr>
+                </thead>
+                <tbody id="fids-body">
+                    <!-- Preenchido via JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Logótipos em SVG fiéis ao painel
+        const LOGOS = {
+            AZUL: `<div class="logo-box"><svg viewBox="0 0 120 40" class="w-full h-full"><text x="5" y="28" font-family="Arial, sans-serif" font-size="22" font-weight="900" fill="#002d72">Azul</text><path d="M95 10 L105 10 L110 18 L100 28 L90 28 Z" fill="#00a3e0"/><circle cx="108" cy="12" r="2.5" fill="#e4002b"/></svg></div>`,
+            LATAM: `<div class="logo-box"><svg viewBox="0 0 140 40" class="w-full h-full"><path d="M5 8 L35 8 L30 14 L10 14 Z" fill="#e2001a"/><path d="M12 18 L38 18 L33 24 L7 24 Z" fill="#00142e"/><text x="42" y="17" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#00142e">LATAM</text><text x="42" y="26" font-family="Arial, sans-serif" font-size="7" font-weight="bold" fill="#e2001a">AIRLINES</text></svg></div>`,
+            GOL: `<div class="logo-box"><svg viewBox="0 0 100 40" class="w-full h-full"><text x="8" y="27" font-family="'Arial Black', sans-serif" font-size="20" font-style="italic" font-weight="900" fill="#ff5a00">GOL</text></svg></div>`
+        };
+
+        // Base de rotas sincronizada com o padrão da foto de referência para Confins (CNF)
+        let baseFlights = [
+            { time: "09:00", est: "08:55", orig: "Rio de Janeiro - Galeão", cia: "GOL", flight: "2022", belt: "2", status: "Last Baggage" },
+            { time: "09:00", est: "08:59", orig: "Vitória", cia: "AZUL", flight: "2761", belt: "1", status: "Last Baggage" },
+            { time: "09:05", est: "09:02", orig: "Campinas", cia: "AZUL", flight: "2658", belt: "1", status: "Parking" },
+            { time: "09:15", est: "09:00", orig: "São Paulo - Congonhas", cia: "LATAM", flight: "3038", belt: "2", status: "Landed" },
+            { time: "09:25", est: "09:50", orig: "Rio de Janeiro - Santos Dumont", cia: "AZUL", flight: "4051", belt: "1", status: "Now at 09:50" },
+            { time: "09:25", est: "09:13", orig: "Porto Seguro", cia: "AZUL", flight: "2475", belt: "1", status: "Baggage Delivery" },
+            { time: "09:35", est: "09:10", orig: "São Paulo - Congonhas", cia: "GOL", flight: "1306", belt: "2", status: "Last Baggage" },
+            { time: "10:00", est: "09:50", orig: "São Paulo - Guarulhos", cia: "LATAM", flight: "4650", belt: "2", status: "Now at 09:50" },
+            { time: "10:15", est: "10:15", orig: "Brasília", cia: "LATAM", flight: "3720", belt: "2", status: "Scheduled" },
+            { time: "10:25", est: "09:57", orig: "São Paulo - Congonhas", cia: "AZUL", flight: "6020", belt: "1", status: "Now at 09:57" },
+            { time: "10:35", est: "10:35", orig: "São Paulo - Guarulhos", cia: "GOL", flight: "1482", belt: "2", status: "Scheduled" },
+            { time: "10:40", est: "10:40", orig: "Governador Valadares", cia: "AZUL", flight: "2758", belt: "1", status: "Scheduled" },
+            { time: "10:55", est: "10:55", orig: "Brasília", cia: "GOL", flight: "1622", belt: "2", status: "Scheduled" },
+            { time: "11:10", est: "11:10", orig: "Campinas", cia: "AZUL", flight: "4045", belt: "1", status: "Scheduled" },
+            { time: "11:15", est: "11:15", orig: "Rio de Janeiro - Santos Dumont", cia: "AZUL", flight: "4118", belt: "1", status: "Scheduled" },
+            { time: "11:15", est: "11:15", orig: "São Paulo - Guarulhos", cia: "AZUL", flight: "4570", belt: "1", status: "Scheduled" },
+            { time: "11:35", est: "11:35", orig: "Brasília", cia: "AZUL", flight: "5068", belt: "1", status: "Scheduled" },
+            { time: "11:35", est: "11:35", orig: "São Paulo - Congonhas", cia: "AZUL", flight: "6400", belt: "1", status: "Scheduled" },
+            { time: "11:45", est: "11:45", orig: "Goiânia", cia: "AZUL", flight: "4016", belt: "1", status: "Scheduled" },
+            { time: "11:45", est: "11:45", orig: "Recife", cia: "AZUL", flight: "2802", belt: "1", status: "Scheduled" }
+        ];
+
+        let filterQuery = '';
+
+        function renderTable() {
+            const tbody = document.getElementById('fids-body');
+            tbody.innerHTML = '';
+
+            const filtered = baseFlights.filter(f => {
+                if (!filterQuery) return true;
+                const q = filterQuery.toLowerCase();
+                return f.flight.toLowerCase().includes(q) || f.orig.toLowerCase().includes(q) || f.status.toLowerCase().includes(q);
+            });
+
+            filtered.forEach(f => {
+                const tr = document.createElement('tr');
+
+                let statusClass = 'status-scheduled';
+                let translatedStatus = f.status;
+
+                if (f.status === 'Landed') {
+                    statusClass = 'status-landed';
+                    translatedStatus = 'Pousado';
+                } else if (f.status === 'Last Baggage') {
+                    statusClass = 'status-baggage';
+                    translatedStatus = 'Última Bagagem';
+                } else if (f.status === 'Parking') {
+                    statusClass = 'status-parking';
+                    translatedStatus = 'Aeronave no Pátio';
+                } else if (f.status === 'Baggage Delivery') {
+                    statusClass = 'status-baggage';
+                    translatedStatus = 'Entrega de Bagagens';
+                } else if (f.status.startsWith('Now at')) {
+                    statusClass = 'status-now';
+                    translatedStatus = f.status.replace('Now at', 'Agora às');
+                } else if (f.status === 'Scheduled') {
+                    translatedStatus = 'Confirmado';
+                }
+
+                tr.innerHTML = `
+                    <td class="text-left pl-4 font-mono text-cyan-300">${f.time}</td>
+                    <td class="font-mono text-emerald-300">${f.est}</td>
+                    <td class="text-left font-bold text-white">${f.orig}</td>
+                    <td>${LOGOS[f.cia] || f.cia}</td>
+                    <td class="font-bold text-yellow-300">${f.flight}</td>
+                    <td class="font-bold text-white">${f.belt}</td>
+                    <td class="text-right pr-6 ${statusClass}">${translatedStatus}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Atualização do Relógio em Tempo Real
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('current-date').innerText = now.toLocaleDateString('pt-BR');
+            document.getElementById('current-time').innerText = now.toLocaleTimeString('pt-BR');
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            filterQuery = e.target.value;
+            renderTable();
+        });
+
+        // Registro de PWA Service Worker via Blob
+        if ('serviceWorker' in navigator) {
+            const swCode = `self.addEventListener('install', e => e.waitUntil(self.skipWaiting())); self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));`;
+            const swBlob = new Blob([swCode], { type: 'text/javascript' });
+            navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(err => console.log('SW error', err));
+        }
+
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('pwa-install-btn').classList.remove('hidden');
+        });
+
+        document.getElementById('pwa-install-btn').addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    document.getElementById('pwa-install-btn').classList.add('hidden');
+                }
+                deferredPrompt = null;
+            }
+        });
+
+        window.onload = function() {
+            renderTable();
+            updateClock();
+            setInterval(updateClock, 1000);
+        };
+    </script>
+</body>
+</html>
